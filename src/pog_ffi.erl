@@ -4,6 +4,10 @@
 
 -include_lib("pog/include/pog_Config.hrl").
 -include_lib("pg_types/include/pg_types.hrl").
+%% pgo_internal.hrl is a private header (it lives in pgo/src/, not pgo/include/).
+%% We rely on it to read decode_opts off the #conn{} record because
+%% pgo_handler:extended_query/4 ignores Conn#conn.decode_opts and hardcodes [].
+-include_lib("pgo/src/pgo_internal.hrl").
 
 null() ->
     null.
@@ -85,8 +89,7 @@ start(Config) ->
 query(Pool, Sql, Arguments, Timeout) ->
     Res = case Pool of
         {single_connection, Conn} ->
-              DecodeOpts = element(11, Conn),
-              pgo_handler:extended_query(Conn, Sql, Arguments, DecodeOpts, #{});
+            pgo_handler:extended_query(Conn, Sql, Arguments, Conn#conn.decode_opts, #{});
         {pool, Name} ->
             Options = #{
                 pool => Name,

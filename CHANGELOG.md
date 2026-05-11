@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed a bug where queries inside `pog.transaction` did not respect the pool's
+  `rows_as_map` configuration. Rows are now returned as maps when the pool is
+  configured with `rows_as_map: True`, both inside and outside transactions.
+
 ## v4.1.0 - 2025-07-14
 
 - Added a `numeric_decoder` to decode numeric types coming from postgres.

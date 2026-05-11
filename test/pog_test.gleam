@@ -515,24 +515,12 @@ pub fn expected_maps_test() {
     VALUES
       (DEFAULT, 'neo', true, ARRAY ['black'], '2022-10-10 11:30:30', '2020-03-04')
     RETURNING
-      id, name"
+      id"
 
   let assert Ok(pog.Returned(rows: [id], ..)) =
     pog.query(sql)
     |> pog.returning(decode.at(["id"], decode.int))
     |> pog.execute(db.data)
-
-  let assert Ok(pog.Returned(1, ["neo"])) =
-    pog.transaction(db.data, fn(conn) {
-      let assert Ok(returned) =
-        pog.query(sql)
-        |> pog.returning(decode.at(["name"], decode.string))
-        |> pog.execute(conn)
-
-      assert returned.rows == ["neo"]
-
-      Ok(returned)
-    })
 
   let assert Ok(returned) =
     pog.query("SELECT * FROM cats WHERE id = $1")
@@ -567,6 +555,41 @@ pub fn expected_maps_test() {
         calendar.Date(2020, calendar.March, 4),
       ),
     ]
+
+  disconnect(db)
+}
+
+// Regression test: queries run inside `pog.transaction` against the checked-out
+// single connection must honour the pool's `rows_as_map` setting. Prior to the
+// fix in pog_ffi:query/4, decode_opts were not threaded through and rows came
+// back as positional tuples even when the pool was configured with
+// `rows_as_map: True`.
+pub fn transaction_respects_rows_as_map_test() {
+  let name = process.new_name("pog_test")
+  let assert Ok(db) =
+    pog.Config(..default_config(name), rows_as_map: True)
+    |> pog.start
+
+  let sql =
+    "
+    INSERT INTO
+      cats
+    VALUES
+      (DEFAULT, 'neo', true, ARRAY ['black'], '2022-10-10 11:30:30', '2020-03-04')
+    RETURNING
+      id, name"
+
+  let assert Ok(pog.Returned(1, ["neo"])) =
+    pog.transaction(db.data, fn(conn) {
+      let assert Ok(returned) =
+        pog.query(sql)
+        |> pog.returning(decode.at(["name"], decode.string))
+        |> pog.execute(conn)
+
+      assert returned.rows == ["neo"]
+
+      Ok(returned)
+    })
 
   disconnect(db)
 }
